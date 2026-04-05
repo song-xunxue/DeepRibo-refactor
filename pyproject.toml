@@ -1,0 +1,109 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deepribo-refactor"
+version = "2.0.0"
+description = "深度神经网络用于原核生物基因注释 - Python 3.12重构版本"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "GNU General Public License v3.0"}
+authors = [
+    {name = "Jim Clauwaert", email = "jim.clauwaert@example.com"},
+    {name = "Gerben Menschaert", email = "gerben.menschaert@example.com"}
+]
+maintainers = [
+    {name = "DeepRibo Team", email = "team@deepribo.org"}
+]
+keywords = [
+    "deep-learning",
+    "gene-annotation",
+    "ribosome-profiling",
+    "prokaryote",
+    "bioinformatics",
+    "neural-network"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.8",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "scipy>=1.10.0",
+    "scikit-learn>=1.3.0",
+    "biopython>=1.80",
+    "matplotlib>=3.7.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+    "pytest>=7.4.0",
+    "jupyter>=1.0.0",
+]
+viz = [
+    "seaborn>=0.12.0",
+    "tensorboard>=2.12.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Biobix/DeepRibo"
+Documentation = "https://github.com/Biobix/DeepRibo/blob/master/README.md"
+Repository = "https://github.com/Biobix/DeepRibo.git"
+"Bug Tracker" = "https://github.com/Biobix/DeepRibo/issues"
+
+[project.scripts]
+deepribo-train = "cli.train:main"
+deepribo-predict = "cli.predict:main"
+deepribo-parse = "cli.data:main"
+
+[tool.setuptools]
+packages = ["src"]
+package-dir = {"" = "src"}
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+minversion = "7.4"
+addopts = "-ra -q"
+testpaths = ["tests"]
+python_files = ["*.py"]
