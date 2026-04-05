@@ -9,6 +9,9 @@
 
 import datetime
 import json
+import csv
+import os
+import shutil
 import argparse
 from typing import Tuple, Union
 
@@ -72,7 +75,8 @@ class Trainer:
         log: Logger = None,
         dest: str = 'default',
         verbose: int = 1,
-        GPU: bool = False
+        GPU: bool = False,
+        metadata: dict = None
     ) -> Logger:
         """
         训练模型（类似Keras的.fit()方法）
@@ -93,6 +97,7 @@ class Trainer:
             dest (str, optional): 模型保存路径，默认为'default'
             verbose (int, optional): 详细模式，0=静默，1=详细，默认为1
             GPU (bool, optional): 是否使用GPU，默认为False
+            metadata (dict, optional): 训练元信息，默认为None
 
         Returns:
             Logger: 包含训练指标的Logger对象
@@ -123,6 +128,10 @@ class Trainer:
         opt = optimizer
 
         # 运行训练循环
+        epoch_records = []
+        best_valid_auc = -1.0
+        best_epoch = 0
+
         for t in range(initial_epoch, epochs):
             if scheduler and t != initial_epoch:
                 scheduler.step()
@@ -198,7 +207,71 @@ class Trainer:
 
             log.output_metrics()
 
+            # 记录本轮指标
+            record = {'epoch': t + 1}
+            for key in log.keys:
+                record[f'{key}_loss'] = log.metrics[key].get('loss', [None])[-1]
+                if log.log_auc and log.metrics[key].get('auc'):
+                    record[f'{key}_auc'] = log.metrics[key]['auc'][-1]
+                if log.log_acc and log.metrics[key].get('acc'):
+                    record[f'{key}_acc'] = log.metrics[key]['acc'][-1]
+                if log.log_p_r and log.metrics[key].get('p-r'):
+                    record[f'{key}_pr'] = log.metrics[key]['p-r'][-1]
+            epoch_records.append(record)
+
+            # 跟踪最佳模型（按valid_auc或train_auc）
+            current_auc = record.get('valid_auc', record.get('train_auc', -1))
+            if current_auc > best_valid_auc:
+                best_valid_auc = current_auc
+                best_epoch = t + 1
+
+        # 保存最佳模型副本
+        best_src = f'{ts_dir}model_epoch_{best_epoch}.pt'
+        if os.path.exists(best_src):
+            shutil.copy2(best_src, f'{ts_dir}best_model.pt')
+            print(f'Best model: epoch {best_epoch} (AUC={best_valid_auc:.4f})')
+
+        # 保存汇总训练日志CSV
+        self._save_training_log(epoch_records, ts_dir, metadata)
+
         return log
+
+    @staticmethod
+    def _save_training_log(
+        records: list,
+        ts_dir: str,
+        metadata: dict = None
+    ) -> None:
+        """
+        保存汇总训练日志为CSV文件
+
+        生成 training_log.csv，包含每轮的训练/验证/测试指标，
+        可直接用于R语言 ggplot2 绘图。
+
+        Args:
+            records (list): 每轮指标的字典列表
+            ts_dir (str): 时间戳目录路径
+            metadata (dict, optional): 训练元信息
+        """
+        if not records:
+            return
+
+        log_path = f'{ts_dir}training_log.csv'
+        headers = list(records[0].keys())
+
+        with open(log_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+
+            # 元信息作为注释行（R可用 comment.char='#' 跳过）
+            if metadata:
+                for k, v in metadata.items():
+                    writer.writerow([f'# {k}={v}'])
+
+            writer.writerow(headers)
+            for rec in records:
+                writer.writerow([rec.get(h, '') for h in headers])
+
+        print(f'Training log saved to {log_path}')
 
     def predict(
         self,
@@ -491,6 +564,23 @@ def train_model(
         test_data
     )
 
+    # 构建训练元信息
+    metadata = {
+        'dataset': '+'.join(train_data) if train_data else 'unknown',
+        'model_type': model_type,
+        'epochs': epochs,
+        'batch_size': batch_size,
+        'GRU_nodes': hidden_size,
+        'GRU_layers': layers,
+        'GRU_bidirect': bidirect,
+        'COV_motifs': motif_count,
+        'FC_nodes': '+'.join(map(str, nodes)) if nodes else 'unknown',
+        'train_rpkm': '+'.join(map(str, train_cutoff[0])) if train_cutoff[0] else 'none',
+        'train_coverage': '+'.join(map(str, train_cutoff[1])) if train_cutoff[1] else 'none',
+        'valid_size': valid_size,
+        'GPU': GPU,
+    }
+
     # 训练模型
     trainer = Trainer(model)
     trainer.fit(
@@ -506,7 +596,8 @@ def train_model(
         log=log,
         dest=dest,
         GPU=GPU,
-        verbose=verbose
+        verbose=verbose,
+        metadata=metadata
     )
 
 
