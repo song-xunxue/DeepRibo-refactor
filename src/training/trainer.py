@@ -306,6 +306,8 @@ class Trainer:
             该方法处理可变长度序列，使用pack_padded_sequence
         """
         # 构建数据类型
+        y_pred = None
+        y_true = None
         if GPU:
             dtypeX = torch.cuda.FloatTensor
             dtypeY = torch.cuda.LongTensor
