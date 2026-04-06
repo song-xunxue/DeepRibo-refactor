@@ -3,12 +3,17 @@
 
 包含各种辅助函数，如类型转换、指标计算等。
 
-作者: DeepRibo Team
+作者: 李文煜
 日期: 2025-04-01
+
+2026-04-06
+变更说明：
+  1. 修复 Python 3.10+ 兼容性问题：collections.Mapping/Sequence 改为 collections.abc.Mapping/Sequence
+  2. 移除 default_collate 中已弃用的 _use_shared_memory 共享内存代码，消除 TypedStorage 和 tensor resize 警告
 """
 
 import argparse
-import collections
+from collections.abc import Mapping, Sequence
 import re
 import numpy as np
 import pandas as pd
@@ -80,7 +85,6 @@ def default_collate(batch: List) -> Union[torch.Tensor, Tuple]:
     }
 
     error_msg = 'batch必须包含张量、数字、字典或列表；找到 {}'
-    _use_shared_memory = True
     string_classes = (str, bytes)
     int_classes = int
 
@@ -89,7 +93,6 @@ def default_collate(batch: List) -> Union[torch.Tensor, Tuple]:
     # 处理张量
     if torch.is_tensor(batch[0]):
         pad = False
-        out = None
 
         # 检查是否需要填充
         if batch[0].shape[0] != 4:
@@ -101,16 +104,10 @@ def default_collate(batch: List) -> Union[torch.Tensor, Tuple]:
             )
             batch.unsqueeze_(2).contiguous()
 
-        if _use_shared_memory:
-            # 如果在后台进程中，直接连接到共享内存张量
-            numel = sum([x.numel() for x in batch])
-            storage = batch[0].storage()._new_shared(numel)
-            out = batch[0].new(storage)
-
         if pad:
             return (batch, batch_lens, sort_order)
         else:
-            return torch.stack(batch, dim=0, out=out)
+            return torch.stack(batch, dim=0)
 
     # 处理NumPy数组
     elif elem_type.__module__ == 'numpy' and \
@@ -140,14 +137,14 @@ def default_collate(batch: List) -> Union[torch.Tensor, Tuple]:
         return batch
 
     # 处理字典
-    elif isinstance(batch[0], collections.Mapping):
+    elif isinstance(batch[0], Mapping):
         return {
             key: default_collate([d[key] for d in batch])
             for key in batch[0]
         }
 
     # 处理序列
-    elif isinstance(batch[0], collections.Sequence):
+    elif isinstance(batch[0], Sequence):
         transposed = zip(*batch)
         return [default_collate(samples) for samples in transposed]
 

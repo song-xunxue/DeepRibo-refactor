@@ -3,8 +3,12 @@
 
 包含训练日志记录和进度条显示功能。
 
-作者: DeepRibo Team
+作者: 李文煜
 日期: 2025-04-01
+
+2026-04-06
+变更说明：
+  1. log_metrics 添加 NaN 检测保护，预测结果含 NaN 时跳过指标计算并记录警告
 """
 
 import sys
@@ -210,6 +214,28 @@ class Logger:
         Note:
             该方法计算并记录AUC、准确率和P-R曲线下面积
         """
+        # 检测NaN，跳过本轮指标计算
+        if np.any(np.isnan(y_hat)) or np.any(np.isnan(y_true)):
+            if self.log_auc:
+                self.metrics[key]['auc'].append(float('nan'))
+            if self.log_acc:
+                self.metrics[key]['acc'].append(float('nan'))
+            if self.log_p_r:
+                self.metrics[key]['p-r'].append(float('nan'))
+            return
+
+        # 检测单类别，跳过AUC/P-R计算（避免sklearn警告）
+        n_classes = len(np.unique(y_true))
+        if n_classes < 2:
+            if self.log_auc:
+                self.metrics[key]['auc'].append(float('nan'))
+            if self.log_acc:
+                acc = np.sum(np.argmax(y_hat, axis=1) == y_true) / len(y_true)
+                self.metrics[key]['acc'].append(acc)
+            if self.log_p_r:
+                self.metrics[key]['p-r'].append(float('nan'))
+            return
+
         if self.log_auc:
             auc = roc_auc_score(y_true, y_hat[:, 1])
             self.metrics[key]['auc'].append(auc)

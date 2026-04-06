@@ -5,11 +5,31 @@
 
 作者: 李文煜
 日期: 2025-04-01
+
+2026-04-06
+已修复两个问题：
+
+  1. BucketSampler.bucketShuffle()：当样本数 < batch_size 时（14 < 256），shuffled_index[inc_batch:]
+  变成空数组，导致采样器产生空索引。现在增加了 n < self.batch_size 的判断，直接打乱全部样本。
+  2. Trainer.predict()：unbucket_idx 移到 if 外初始化，并在返回前检查 y_pred is None，防止空 loader 崩溃。
+
+2026-04-06
+变更说明：
+  1. 修复 predict() 中 y_true 初始化形状错误：y_true 应按 y_batch 的形状初始化（1D标签），
+     而非 y_batch_pred 的形状（2D logits），避免维度不匹配 RuntimeError。
+  2. 训练循环添加梯度裁剪 (clip_grad_norm_ max_norm=5.0)，防止梯度爆炸导致 NaN。
+
+2026-04-06
+变更说明：
+  1. train_model() 添加数据验证：检查过滤后训练集是否只有单一类别，
+     若是则报错退出并提示降低 cutoff，避免 CrossEntropyLoss 归一化 0/0 导致全 NaN。
+  2. 最佳模型选择修复：valid_auc 为 NaN 时回退到 train_auc，确保 best_model.pt 始终生成。
 """
 
 import datetime
 import json
 import csv
+import math
 import os
 import shutil
 import argparse
@@ -158,6 +178,7 @@ class Trainer:
 
                 batch_loss = loss(y_batch_pred, y_batch)
                 batch_loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=5.0)
                 opt.step()
 
                 # 更新状态
@@ -219,17 +240,22 @@ class Trainer:
                     record[f'{key}_pr'] = log.metrics[key]['p-r'][-1]
             epoch_records.append(record)
 
-            # 跟踪最佳模型（按valid_auc或train_auc）
-            current_auc = record.get('valid_auc', record.get('train_auc', -1))
-            if current_auc > best_valid_auc:
+            # 跟踪最佳模型（优先用valid_auc，NaN时回退到train_auc）
+            valid_auc = record.get('valid_auc', None)
+            train_auc = record.get('train_auc', -1)
+            current_auc = train_auc  # 默认用train_auc
+            if valid_auc is not None and not math.isnan(valid_auc):
+                current_auc = valid_auc  # valid_auc有效时优先使用
+            if not math.isnan(current_auc) and current_auc > best_valid_auc:
                 best_valid_auc = current_auc
                 best_epoch = t + 1
 
         # 保存最佳模型副本
-        best_src = f'{ts_dir}model_epoch_{best_epoch}.pt'
-        if os.path.exists(best_src):
-            shutil.copy2(best_src, f'{ts_dir}best_model.pt')
-            print(f'Best model: epoch {best_epoch} (AUC={best_valid_auc:.4f})')
+        if best_epoch > 0:
+            best_src = f'{ts_dir}model_epoch_{best_epoch}.pt'
+            if os.path.exists(best_src):
+                shutil.copy2(best_src, f'{ts_dir}best_model.pt')
+                print(f'Best model: epoch {best_epoch} (AUC={best_valid_auc:.4f})')
 
         # 保存汇总训练日志CSV
         self._save_training_log(epoch_records, ts_dir, metadata)
@@ -341,7 +367,7 @@ class Trainer:
 
                 if r == 0:
                     y_pred = torch.zeros((n,) + y_batch_pred.size()[1:])
-                    y_true = torch.zeros((n,) + y_batch_pred.data.size()[1:])
+                    y_true = torch.zeros((n,) + y_batch.size()[1:])
 
                 # 添加到预测张量
                 unsort_idx = np.argsort(sort_order)
@@ -352,10 +378,14 @@ class Trainer:
                 pb.bar(b_i)
 
         # 解桶排序
+        unbucket_idx = None
         if hasattr(loader, 'batch_sampler'):
             unbucket_idx = np.argsort(loader.batch_sampler.sampler.idx_list)
 
         pb.close()
+
+        if y_pred is None:
+            return torch.zeros(0), torch.zeros(0)
 
         return y_pred[unbucket_idx], y_true[unbucket_idx]
 
@@ -527,6 +557,21 @@ def train_model(
     print(f"{sample_train} samples in train data")
     print(f"{sample_valid} samples in valid data")
 
+    # 数据验证：检查训练集类别分布
+    y_train = train_loader.dataset.y_train
+    n_pos = int(sum(y_train))
+    n_neg = len(y_train) - n_pos
+    print(f"标签分布: 正样本={n_pos}, 负样本={n_neg}")
+
+    if n_pos == 0 or n_neg == 0:
+        print(f"\n错误: 过滤后训练集只有单一类别 (正={n_pos}, 负={n_neg})！")
+        print("可能原因: cutoff 阈值过高，过滤掉了某个类别的全部样本。")
+        print("建议: 降低 -r/--rpkm 和 -c/--coverage 参数值（如 -r 0.0 -c 0.0）后重试。")
+        return
+
+    if min(n_pos, n_neg) / max(n_pos, n_neg) < 0.01:
+        print(f"\n警告: 数据极度不平衡 (正/负 = {n_pos}/{n_neg})，训练效果可能不佳。")
+
     # 选择设备
     if GPU:
         device = torch.device('cuda')
@@ -534,7 +579,7 @@ def train_model(
         device = torch.device('cpu')
 
     # 创建加权损失（严重不平衡的数据）
-    ratio = sum(train_loader.dataset.y_train) / len(train_loader.dataset.y_train)
+    ratio = n_pos / len(y_train)
     weights = torch.FloatTensor([ratio, 1 - ratio]).to(device)
 
     # 初始化模型

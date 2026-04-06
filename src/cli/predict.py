@@ -74,13 +74,13 @@ def main() -> None:
         '-l', '--GRU_layers',
         default=2,
         choices=[1, 2],
-        type=str,
+        type=int,
         help="顺序GRU层的数量"
     )
     parser.add_argument(
         '-B', '--GRU_bidirect',
         default=True,
-        type=bool,
+        type=lambda x: x.lower() in ('true', '1', 'yes'),
         help="使用双向GRU单元"
     )
     parser.add_argument(

@@ -3,8 +3,16 @@
 
 包含自定义的数据采样器，用于批次采样和桶排序。
 
-作者: DeepRibo Team
+作者: 李文煜
 日期: 2025-04-01
+
+2026-04-06
+已修复问题：
+
+  1. BucketSampler.bucketShuffle()：当样本数 < batch_size 时，shuffled_index[inc_batch:]
+  变成空数组导致采样器产生空索引。新增 n < self.batch_size 判断，直接打乱全部样本。
+  2. bucketShuffle() 补齐修正：使用 shuffled_index[:inc_batch]（leftover samples），
+     而非 shuffled_index_list[:inc_batch]（batch-shuffled samples），与原版一致。
 """
 
 import numpy as np
@@ -154,22 +162,28 @@ class BucketSampler(Sampler):
         Note:
             应该在每个epoch开始时调用此方法
         """
+        n = len(self.lens)
+
         # 在区域内洗牌行
-        region_size = np.maximum(
-            int(len(self.lens) / self.batch_size // 12), 100
-        )
-        inc_batch_reg = len(self.lens) % region_size
+        region_size = np.maximum(int(n / self.batch_size // 12), 100)
+        inc_batch_reg = n % region_size
         index_list = np.array(self.sort_idx[inc_batch_reg:])
         np.random.shuffle(np.reshape(index_list, (-1, region_size)).T)
         shuffled_index = np.hstack((index_list, self.sort_idx[:inc_batch_reg]))
 
+        # 样本数不足一个batch时，直接打乱全部样本
+        if n < self.batch_size:
+            self.idx_list = shuffled_index.copy()
+            np.random.shuffle(self.idx_list)
+            return
+
         # 在数据集中洗牌批次
-        inc_batch = len(self.lens) % self.batch_size
+        inc_batch = n % self.batch_size
         shuffled_index_list = shuffled_index[inc_batch:]
         np.random.shuffle(np.reshape(shuffled_index_list, (-1, self.batch_size)))
 
-        # 设置数据集的新顺序
+        # 设置数据集的新顺序（与原版一致：使用 leftover samples 补齐）
         self.idx_list = np.hstack((
             shuffled_index_list,
-            shuffled_index_list[:inc_batch]
+            shuffled_index[:inc_batch]
         ))

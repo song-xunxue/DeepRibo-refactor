@@ -3,8 +3,12 @@
 
 包含自定义的Adam优化器实现。
 
-作者: DeepRibo Team
+作者: 李文煜
 日期: 2025-04-01
+
+2026-04-06
+变更说明：
+  1. 修复 PyTorch 新版本弃用 API：add/add_/addcmul_/addcdiv_ 改为 keyword 参数形式
 """
 
 import math
@@ -138,11 +142,11 @@ class Adam(Optimizer):
 
                 # 权重衰减（L2正则化）
                 if group['weight_decay'] != 0:
-                    grad = grad.add(group['weight_decay'], p.data)
+                    grad = grad.add(p.data, alpha=group['weight_decay'])
 
                 # 衰减一阶和二阶矩的运行平均系数
-                exp_avg.mul_(beta1).add_(1 - beta1, grad)
-                exp_avg_sq.mul_(beta2).addcmul_(1 - beta2, grad, grad)
+                exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
+                exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
 
                 if amsgrad:
                     # 维护所有二阶矩的运行平均值最大值
@@ -162,6 +166,6 @@ class Adam(Optimizer):
                 )
 
                 # 更新参数
-                p.data.addcdiv_(-step_size, exp_avg, denom)
+                p.data.addcdiv_(exp_avg, denom, value=-step_size)
 
         return loss
