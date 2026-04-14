@@ -712,7 +712,7 @@ def predict(
     model.to(device)
 
     # 加载预训练权重
-    model.load_state_dict(torch.load(model_name, map_location=device))
+    model.load_state_dict(torch.load(model_name, map_location=device, weights_only=True))
 
     # 进行预测
     trainer = Trainer(model)

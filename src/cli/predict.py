@@ -5,10 +5,89 @@
 
 作者: 李文煜
 日期: 2025-04-02
+
+2026-04-12
+变更说明：
+  1. -M/--model 参数改为可选，省略时自动查找 models/{pred_data}/ 下最新的 best_model.pt
+  2. 修复 pred_cutoff 格式：将 (float, float) 包装为 ([float], [float])，匹配 dataset.py 的预期格式
+  3. -d/--dest 参数改为可选，省略时自动生成与模型时间戳对应的路径 predictions/{pred_data}/{时间戳}/predictions.csv
 """
 
 import argparse
+import glob as glob_mod
+import os
 from ..training import predict
+
+
+def _find_latest_model(pred_data: str, model_dir: str = 'models') -> str:
+    """
+    在 models/{pred_data}/ 下查找最新的 best_model.pt
+
+    参数:
+        pred_data: 菌种名称（如 bac, eco）
+        model_dir: 模型根目录，默认 'models'
+
+    返回:
+        最新 best_model.pt 的完整路径
+
+    异常:
+        FileNotFoundError: 未找到任何 best_model.pt
+    """
+    species_dir = os.path.join(model_dir, pred_data)
+    if not os.path.isdir(species_dir):
+        raise FileNotFoundError(
+            f"模型目录不存在: {species_dir}\n"
+            f"请先训练模型，或通过 -M 手动指定模型路径"
+        )
+
+    # 查找所有时间戳子目录下的 best_model.pt
+    pattern = os.path.join(species_dir, '*', 'best_model.pt')
+    candidates = glob_mod.glob(pattern)
+
+    if not candidates:
+        raise FileNotFoundError(
+            f"在 {species_dir} 下未找到任何 best_model.pt\n"
+            f"请先训练模型，或通过 -M 手动指定模型路径"
+        )
+
+    # 按修改时间排序，取最新的
+    latest = max(candidates, key=os.path.getmtime)
+    return latest
+
+
+def _extract_timestamp(model_path: str) -> str:
+    """
+    从模型路径中提取时间戳目录名
+
+    模型路径格式: models/{菌种}/{时间戳}/best_model.pt
+    或: {任意前缀}/{时间戳}/best_model.pt
+
+    参数:
+        model_path: 模型文件路径
+
+    返回:
+        时间戳目录名（如 '2026-04-06-23-24'）
+    """
+    # 取父目录名即为时间戳
+    ts_dir = os.path.basename(os.path.dirname(model_path))
+    return ts_dir
+
+
+def _auto_dest(pred_data: str, model_path: str) -> str:
+    """
+    根据菌种名和模型时间戳自动生成预测输出路径
+
+    格式: predictions/{pred_data}/{时间戳}/predictions.csv
+
+    参数:
+        pred_data: 菌种名称
+        model_path: 模型文件路径
+
+    返回:
+        自动生成的输出路径
+    """
+    ts = _extract_timestamp(model_path)
+    return os.path.join('predictions', pred_data, ts, 'predictions.csv')
 
 
 def main() -> None:
@@ -52,15 +131,14 @@ def main() -> None:
     parser.add_argument(
         '-M', '--model',
         type=str,
-        required=True,
-        help="预训练模型的路径"
+        default=None,
+        help="预训练模型的路径；省略时自动查找 models/{pred_data}/ 下最新的 best_model.pt"
     )
     parser.add_argument(
         '-d', '--dest',
-        default='predictions.csv',
+        default=None,
         type=str,
-        required=True,
-        help="保存预测结果的文件路径"
+        help="保存预测结果的文件路径；省略时自动生成 predictions/{pred_data}/{时间戳}/predictions.csv"
     )
 
     # 可选参数
@@ -122,13 +200,28 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    print(f"使用模型 {args.model} 创建预测\n使用参数: {args}")
+    # 自动查找最新模型
+    model_path = args.model
+    if model_path is None:
+        model_path = _find_latest_model(args.pred_data)
+        print(f"自动选择最新模型: {model_path}")
+
+    # 自动生成输出路径
+    dest = args.dest
+    if dest is None:
+        dest = _auto_dest(args.pred_data, model_path)
+        print(f"自动输出路径: {dest}")
+
+    # 确保输出目录存在
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+
+    print(f"使用模型 {model_path} 创建预测\n使用参数: {args}")
     predict(
         data_path=args.data_path,
         pred_data=[args.pred_data],
-        pred_cutoff=(args.rpkm, args.coverage),
-        model_name=args.model,
-        dest=args.dest,
+        pred_cutoff=([args.rpkm], [args.coverage]),
+        model_name=model_path,
+        dest=dest,
         batch_size=256,
         hidden_size=args.GRU_nodes,
         layers=args.GRU_layers,

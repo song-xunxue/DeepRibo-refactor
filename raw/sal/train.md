@@ -4,6 +4,8 @@
 
 **原始数据**: 2.3 MB（bedgraph信号文件仅数KB，为最小测试集）
 
+**注意**: sal 数据集正样本极少（仅4个），属于极小测试集，训练效果有限。建议仅用于流程验证。
+
 ## 解析数据
 
 ```bash
@@ -12,12 +14,15 @@ python -m src.cli.data raw/sal/sal_cov_sense.bedgraph raw/sal/sal_cov_asense.bed
 
 ## 训练模型
 
+> cutoff 必须设为 0.0，否则正样本会被过滤掉导致训练失败（NaN）。
+> 过滤后约 386 个样本（正=4, 负=382），极度不平衡。
+
 ```bash
-python -m src.cli.train ../DeepRibo-data/processed --train_data sal -r 0.12 -c 0.12 -e 20 -b 256 -d models/sal --GPU
+python -m src.cli.train ../DeepRibo-data/processed --train_data sal -r 0.0 -c 0.0 -e 20 -b 256 -d models/sal --GPU
 ```
 
 ## 预测
 
 ```bash
-python -m src.cli.predict ../DeepRibo-data/processed --pred_data sal -r 0.12 -c 0.15 -M models/sal/{时间戳目录}/model_epoch_20.pt -d predictions/sal/predictions.csv --GPU
+python -m src.cli.predict ../DeepRibo-data/processed --pred_data sal -r 0.0 -c 0.0 --GPU
 ```

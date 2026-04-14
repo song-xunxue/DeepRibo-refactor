@@ -24,5 +24,5 @@ python -m src.cli.train ../DeepRibo-data/processed --train_data bac -r 0.0 -c 0.
 ## 预测
 
 ```bash
-python -m src.cli.predict ../DeepRibo-data/processed --pred_data bac -r 0.0 -c 0.0 -M models/bac/{时间戳目录}/model_epoch_20.pt -d predictions/bac/predictions.csv --GPU
+python -m src.cli.predict ../DeepRibo-data/processed --pred_data bac -r 0.0 -c 0.0 --GPU
 ```

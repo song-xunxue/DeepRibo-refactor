@@ -209,10 +209,10 @@ def extend_lib(df: pd.DataFrame, pred: np.ndarray) -> pd.DataFrame:
                     dist[mask] = -1
 
     df['SS'] = SS
-    df['dist'] = dist.astype(np.int)
+    df['dist'] = dist.astype(int)
 
     # 起始位点预测排名
-    SS_pred_rank = np.full(len(df), 999999, dtype=np.int)
+    SS_pred_rank = np.full(len(df), 999999, dtype=int)
     sort_idx = df[df['SS']].sort_values(by='pred').index.values[::-1]
     SS_pred_rank[sort_idx] = np.arange(len(df[df['SS']]))
     df['SS_pred_rank'] = SS_pred_rank

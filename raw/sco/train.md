@@ -12,6 +12,9 @@ python -m src.cli.data raw/sco/sco_cov_sense.bedgraph raw/sco/sco_cov_asense.bed
 
 ## 训练模型
 
+> cutoff=0.15，过滤后约 3846 个样本（正=187, 负=3659）。
+> 已验证：best model valid AUC=0.9734（epoch 9）。
+
 ```bash
 python -m src.cli.train ../DeepRibo-data/processed --train_data sco -r 0.15 -c 0.15 -e 20 -b 256 -d models/sco --GPU
 ```
@@ -19,5 +22,5 @@ python -m src.cli.train ../DeepRibo-data/processed --train_data sco -r 0.15 -c 0
 ## 预测
 
 ```bash
-python -m src.cli.predict ../DeepRibo-data/processed --pred_data sco -r 0.15 -c 0.20 -M models/sco/{时间戳目录}/model_epoch_20.pt -d predictions/sco/predictions.csv --GPU
+python -m src.cli.predict ../DeepRibo-data/processed --pred_data sco -r 0.15 -c 0.15 --GPU
 ```

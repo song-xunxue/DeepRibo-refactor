@@ -19,5 +19,5 @@ python -m src.cli.train ../DeepRibo-data/processed --train_data eco -r 0.12 -c 0
 ## 预测
 
 ```bash
-python -m src.cli.predict ../DeepRibo-data/processed --pred_data eco -r 0.12 -c 0.15 -M models/eco/{时间戳目录}/model_epoch_20.pt -d predictions/eco/predictions.csv --GPU
+python -m src.cli.predict ../DeepRibo-data/processed --pred_data eco -r 0.12 -c 0.15 --GPU
 ```
