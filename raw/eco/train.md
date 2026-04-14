@@ -16,6 +16,14 @@ python -m src.cli.data raw/eco/eco_cov_sense.bedgraph raw/eco/eco_cov_asense.bed
 python -m src.cli.train ../DeepRibo-data/processed --train_data eco -r 0.12 -c 0.12 -e 20 -b 256 -d models/eco --GPU
 ```
 
+## 训练模型（显式验证集划分）
+
+> 显式指定 `--valid_size 0.1`（10%），增大验证集比例以获得更可靠的验证指标。
+
+```bash
+python -m src.cli.train ../DeepRibo-data/processed --train_data eco -r 0.12 -c 0.12 -e 20 -b 256 -d models/eco-valid10 --valid_size 0.1 --GPU
+```
+
 ## 预测
 
 ```bash

@@ -19,6 +19,14 @@ python -m src.cli.data raw/sco/sco_cov_sense.bedgraph raw/sco/sco_cov_asense.bed
 python -m src.cli.train ../DeepRibo-data/processed --train_data sco -r 0.15 -c 0.15 -e 20 -b 256 -d models/sco --GPU
 ```
 
+## 训练模型（显式验证集划分）
+
+> 显式指定 `--valid_size 0.1`（10%），增大验证集比例以获得更可靠的验证指标。
+
+```bash
+python -m src.cli.train ../DeepRibo-data/processed --train_data sco -r 0.15 -c 0.15 -e 20 -b 256 -d models/sco-valid10 --valid_size 0.1 --GPU
+```
+
 ## 预测
 
 ```bash
