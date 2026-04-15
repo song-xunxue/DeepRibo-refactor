@@ -5,6 +5,10 @@
 
 作者: 李文煜
 日期: 2025-04-02
+
+2026-04-14
+变更说明：
+  1. --model_type 新增 CNNRNN_V11 选项（阶段一改进模型）
 """
 
 import argparse
@@ -138,8 +142,8 @@ def main() -> None:
         '--model_type',
         default='CNNRNN',
         type=str,
-        choices=['CNNRNN', 'CNN', 'RNN'],
-        help="使用CNNRNN、CNN或RNN架构"
+        choices=['CNNRNN', 'CNN', 'RNN', 'CNNRNN_V11'],
+        help="使用CNNRNN、CNN、RNN或CNNRNN_V11（阶段一改进）架构"
     )
     parser.add_argument(
         '--num_workers',

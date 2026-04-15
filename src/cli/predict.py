@@ -11,6 +11,10 @@
   1. -M/--model 参数改为可选，省略时自动查找 models/{pred_data}/ 下最新的 best_model.pt
   2. 修复 pred_cutoff 格式：将 (float, float) 包装为 ([float], [float])，匹配 dataset.py 的预期格式
   3. -d/--dest 参数改为可选，省略时自动生成与模型时间戳对应的路径 predictions/{pred_data}/{时间戳}/predictions.csv
+
+2026-04-14
+变更说明：
+  1. --model_type 新增 CNNRNN_V11 选项（阶段一改进模型）
 """
 
 import argparse
@@ -178,8 +182,8 @@ def main() -> None:
         '--model_type',
         default='CNNRNN',
         type=str,
-        choices=['CNNRNN', 'CNN', 'RNN'],
-        help="使用CNNRNN、CNN或RNN架构"
+        choices=['CNNRNN', 'CNN', 'RNN', 'CNNRNN_V11'],
+        help="使用CNNRNN、CNN、RNN或CNNRNN_V11（阶段一改进）架构"
     )
     parser.add_argument(
         '--num_workers',
