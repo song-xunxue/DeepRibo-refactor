@@ -1,9 +1,0 @@
-# 通用忽略规则（编译产物 / IDE / OS / 密钥 / 模型大文件等）
-# 见全局 ~/.gitignore_global（git config core.excludesfile）
-# 本文件只放本仓库的专属规则
-
-# 训练产物与预测输出（体积大，不进库）
-predictions/
-outputs/
-*.bedgraph
-*.gff
